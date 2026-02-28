@@ -18,6 +18,7 @@ dependencies = [
   "numpy",
   "scikit-learn",
   "pandas",
+  "rich",
 ]
 
 [project.optional-dependencies]
@@ -49,3 +50,4 @@ ai-web-agent = "cbinder_gbfs.ai_browser_agent:main"
 ai-monitor = "cbinder_gbfs.ai_monitor:main"
 ai-backup = "cbinder_gbfs.ai_backup:main"
 ai-logs = "cbinder_gbfs.ai_logs:main"
+ai-dashboard = "cbinder_gbfs.ai_dashboard:main"

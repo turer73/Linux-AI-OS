@@ -39,6 +39,7 @@ setup(
             'ai-monitor=cbinder_gbfs.ai_monitor:main',
             'ai-backup=cbinder_gbfs.ai_backup:main',
             'ai-logs=cbinder_gbfs.ai_logs:main',
+            'ai-dashboard=cbinder_gbfs.ai_dashboard:main',
         ],
     },
     python_requires='>=3.8',
