@@ -1,0 +1,60 @@
+# Build outputs
+bin/
+build/
+*.o
+*.ko
+*.mod
+*.mod.c
+*.cmd
+modules.order
+Module.symvers
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+*.egg
+*.whl
+
+# AI models & data
+*.pt
+*.pth
+*.onnx
+*.tflite
+*.h5
+ai_lfs_log.csv
+ai_dataset.csv
+
+# Logs
+*.log
+.ai_logs/
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Config (local overrides)
+/var/AI-stump/
+
+# Secrets
+.env
+.env.local
+.env.production
+
+# Claude Code local data
+.claude/

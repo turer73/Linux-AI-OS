@@ -1,0 +1,20 @@
+# Core (always required - ~50 MB total)
+psutil
+PyYAML
+numpy
+
+# ML (lightweight - ~200 MB total)
+scikit-learn
+pandas
+
+# Optional extras (install only if needed):
+# pip install watchdog       # config file watching
+# pip install pyttsx3        # text-to-speech
+# pip install matplotlib     # visualization
+# pip install seaborn        # heatmap visualization
+# pip install onnxruntime    # fast model inference (~50 MB, replaces torch)
+# pip install tflite-runtime # TF Lite inference (~5 MB, replaces tensorflow)
+#
+# HEAVY (avoid on low-spec systems):
+# pip install torch          # ~2 GB - only needed for model TRAINING
+# pip install tensorflow     # ~1.5 GB - replaced by tflite-runtime for inference

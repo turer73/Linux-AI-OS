@@ -1,0 +1,96 @@
+# Linux-AI Agent Configuration
+# Path: /var/AI-stump/ai-agent.yml
+#
+# Agent system settings for ai-agent, ai-web-agent, kernel bridge
+
+agent:
+  # Model selection (auto-detect: agent 7B > coder 3B > fallback)
+  model_primary: "linux-ai-agent"       # 7B tool-calling (preferred)
+  model_fallback: "linux-ai-coder"      # 3B coder (fallback)
+  ollama_api: "http://localhost:11434"
+  max_context_messages: 20              # Keep last N messages in memory
+  response_timeout_sec: 120             # Max wait for model response
+  max_memory_mb: 300                    # RSS limit for agent process
+
+  # Safety settings
+  require_confirm_writes: true          # Always ask before system changes
+  require_confirm_commands: true        # Always ask before running commands
+  allowed_read_paths:                   # Paths agent can read without confirm
+    - "/var/AI-stump/"
+    - "/proc/ai_"
+    - "/sys/ai/"
+    - "/proc/cpuinfo"
+    - "/proc/meminfo"
+  command_whitelist:                    # Commands agent can request to run
+    - "systemctl status"
+    - "systemctl is-active"
+    - "df"
+    - "free"
+    - "uptime"
+    - "uname"
+    - "ollama list"
+    - "ollama ps"
+    - "ping -c 3"
+  dangerous_patterns:                   # Always blocked
+    - "rm "
+    - "dd "
+    - "mkfs"
+    - "sudo rm"
+    - "> /dev/"
+    - "chmod 777"
+    - "curl | sh"
+    - "eval "
+
+kernel_bridge:
+  device_path: "/dev/ai_ctl"
+  proc_status: "/proc/ai_status"
+  proc_config: "/proc/ai_config"
+  sysfs_base: "/sys/ai"
+  auto_connect: true                    # Try to open kernel bridge on startup
+
+web_agent:
+  # API tokens (read from environment variables, never stored here)
+  # Set these in your shell:
+  #   export VERCEL_TOKEN=your_token
+  #   export CLOUDFLARE_API_TOKEN=your_token
+  #   export SUPABASE_ACCESS_TOKEN=your_token
+  #   export FAL_KEY=your_key
+  api_timeout_sec: 30
+  max_response_size: 4096               # Truncate large API responses
+
+  # Site health check defaults
+  health_check:
+    timeout_sec: 15
+    warn_response_time_ms: 2000         # Warn if site responds > 2s
+    check_ssl: true
+    check_headers:                      # Security headers to verify
+      - "Strict-Transport-Security"
+      - "X-Content-Type-Options"
+      - "X-Frame-Options"
+
+  # Services
+  vercel:
+    api_base: "https://api.vercel.com"
+    deploy_limit: 5                     # Show last N deployments
+
+  cloudflare:
+    api_base: "https://api.cloudflare.com/client/v4"
+    analytics_days: 7                   # Default analytics period
+
+  supabase:
+    api_base: "https://api.supabase.com/v1"
+
+  fal:
+    api_base: "https://fal.run"
+    default_model: "fal-ai/flux/dev"
+
+  coolify:
+    # Self-hosting platform - set COOLIFY_API_BASE env var to your server
+    api_base: "http://localhost:8000/api/v1"
+    auto_deploy_on_push: false          # Don't auto-deploy without confirmation
+
+logging:
+  level: "info"                         # debug, info, warn, error
+  file: "/var/AI-stump/ai-agent.log"
+  max_size_mb: 10
+  rotate_count: 3

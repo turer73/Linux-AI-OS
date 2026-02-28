@@ -1,0 +1,5 @@
+# Kbuild - Linux-AI kernel module build configuration
+obj-m := linux_ai.o
+linux_ai-objs := ai_core.o ai_procfs.o ai_sysfs.o
+
+ccflags-y := -I$(src)/../include -Wall -Wextra

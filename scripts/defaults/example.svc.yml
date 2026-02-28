@@ -1,0 +1,44 @@
+# Linux-AI Service Profile Example
+# Copy and customize for your use case.
+# Path: /var/AI-stump/profiles/<name>.svc.yml
+
+service:
+  name: "my-ai-service"
+  description: "Example AI service profile"
+  enabled: true
+  autostart: false
+
+process:
+  binary: "/usr/local/bin/my-app"
+  args: ["--daemon", "--config", "/etc/my-app.conf"]
+  working_dir: "/var/run/my-app"
+  user: "nobody"
+  group: "nogroup"
+
+cpu_affinity:
+  enabled: true
+  cores: [0, 1, 2, 3]           # pin to specific cores, or "auto"
+  nice: -5                       # scheduling priority (-20 to 19)
+  policy: "SCHED_OTHER"          # SCHED_OTHER, SCHED_FIFO, SCHED_RR
+
+resource_limits:
+  max_cpu_percent: 80
+  max_ram_mb: 2048
+  max_open_files: 4096
+  oom_score_adj: 200             # higher = more likely to be killed by OOM
+
+monitoring:
+  enabled: true
+  poll_interval_sec: 10
+  alerts:
+    cpu_threshold: 90
+    ram_threshold: 85
+    restart_on_crash: true
+    max_restarts: 3
+    restart_delay_sec: 5
+
+logging:
+  stdout: "/var/log/ai-services/my-app.log"
+  stderr: "/var/log/ai-services/my-app.err"
+  rotate: true
+  max_size_mb: 100

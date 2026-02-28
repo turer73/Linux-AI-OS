@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "proc-utils-AI"
+version = "0.3.0"
+description = "AI-powered process and CPU utility tools"
+readme = "README.md"
+license = {text = "GPL-2.0-only"}
+authors = [
+  {name = "Zaman Huseyinli", email = "admin@azccriminal.space"}
+]
+requires-python = ">=3.8"
+dependencies = [
+  "psutil",
+  "PyYAML",
+  "numpy",
+  "scikit-learn",
+  "pandas",
+]
+
+[project.optional-dependencies]
+ml-train = ["torch"]
+quantize = ["tensorflow"]
+desktop = ["tflite-runtime"]
+voice = ["pyttsx3"]
+viz = ["matplotlib", "seaborn"]
+watch = ["watchdog"]
+ai-dev = []
+webops = ["requests"]
+full = ["torch", "tensorflow", "pyttsx3", "matplotlib", "seaborn", "watchdog"]
+
+[project.scripts]
+ai-cpufregd = "cbinder_gbfs.ai_cpufregd:main"
+ai-voicer = "cbinder_gbfs.ai_voicer:main"
+ai-analyzer = "cbinder_gbfs.ai_analyzer:main"
+cpu-mapping-visualizer = "cbinder_gbfs.cpu_mapping_visualizer:main"
+ai-lfs = "cbinder_gbfs.ai_lfs:main"
+train-ai-model = "cbinder_gbfs.train_ai_model:main"
+ai-affinity = "cbinder_gbfs.ai_affinity:main"
+simulate-io-stats = "cbinder_gbfs.simulate_io_stats:main"
+ai-greeting = "cbinder_gbfs.ai_greeting:main"
+quantize-model = "cbinder_gbfs.quantize_model:main"
+ai-dev-setup = "cbinder_gbfs.ai_dev_setup:main"
+ai-webops = "cbinder_gbfs.ai_webops:main"
+ai-agent = "cbinder_gbfs.ai_agent:main"
+ai-web-agent = "cbinder_gbfs.ai_browser_agent:main"
+ai-monitor = "cbinder_gbfs.ai_monitor:main"
+ai-backup = "cbinder_gbfs.ai_backup:main"
+ai-logs = "cbinder_gbfs.ai_logs:main"

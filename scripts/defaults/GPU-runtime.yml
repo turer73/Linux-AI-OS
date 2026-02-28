@@ -1,0 +1,45 @@
+# Linux-AI GPU Runtime Configuration
+# Path: /var/AI-stump/GPU-runtime.yml
+#
+# Optimized for: NVIDIA GeForce GT 330M (Fermi, 973 MB VRAM)
+# GT 330M does NOT support NVML API - uses nvidia-smi CLI fallback
+
+gpu:
+  monitor_enabled: true
+  vendor_auto_detect: true
+  poll_interval_ms: 5000         # 5s (GT 330M is legacy, reduce overhead)
+  buffer_size: 16                # reduced from 64 (single GPU, small VRAM)
+
+  # Vendor-specific paths (auto-detected when vendor_auto_detect: true)
+  amd:
+    hwmon_path: "/sys/class/drm/card0/device/hwmon"
+    gpu_busy_file: "gpu_busy_percent"
+    vram_used_file: "mem_info_vram_used"
+    vram_total_file: "mem_info_vram_total"
+    temp_input: "temp1_input"
+    power_file: "power1_average"
+
+  intel:
+    i915_path: "/sys/class/drm/card0"
+    frequency_file: "gt_cur_freq_mhz"
+    max_frequency_file: "gt_max_freq_mhz"
+    min_frequency_file: "gt_min_freq_mhz"
+
+  nvidia:
+    enabled: true                # GT 330M detected via lspci
+    smi_path: "/usr/bin/nvidia-smi"
+    nvml_enabled: false          # Fermi (GT 330M) has NO NVML support
+    legacy_mode: true            # use nvidia-smi CLI parsing
+    vram_total_mb: 973           # GT 330M fixed VRAM
+
+alerts:
+  gpu_temp_threshold: 80         # GT 330M runs hotter, lower threshold
+  gpu_usage_threshold: 90        # lowered from 95
+  vram_usage_threshold: 85       # 973 MB VRAM, be cautious
+  notification_method: "notify-send"
+
+logging:
+  log_file: "/var/AI-stump/ai-gpu-log.json"
+  log_level: "info"
+  max_log_size_mb: 10            # reduced from 50 (SSD space conservation)
+  rotate_count: 3

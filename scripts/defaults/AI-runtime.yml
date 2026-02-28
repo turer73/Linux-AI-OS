@@ -1,0 +1,43 @@
+# Linux-AI Runtime Configuration
+# Path: /var/AI-stump/AI-runtime.yml
+#
+# Optimized for: i7-M640 (2C/4T), 8 GB RAM, GT 330M
+
+ai_engine:
+  mode: "USER"                    # ADMIN or USER
+  log_level: "info"               # debug, info, warn, error
+  log_dir: "~/.ai_logs"
+  max_memory_mb: 200              # RSS limit for AI daemon
+  inference_backend: "sklearn"    # sklearn (default), torch (optional), rules (fallback)
+
+cpu:
+  governor: "schedutil"           # performance, powersave, schedutil, ondemand
+  turbo: true
+  monitor_interval_ms: 3000       # 3s (lowered from 2s to reduce CPU load)
+  usage_threshold_percent: 70     # alert when CPU > this
+  buffer_size: 32                 # reduced from 64 (2 cores = less data)
+  max_cores: 4                    # i7-M640: 2 cores / 4 threads
+
+gpu:
+  monitor_enabled: true
+  vendor_auto_detect: true
+  buffer_size: 16                 # GT 330M: minimal buffer needed
+
+affinity:
+  enabled: true
+  poll_interval_sec: 10           # increased from 5s (less frequent polling)
+  default_nice: 0
+  log_file: "/var/AI-stump/ai-affinity-log.json"
+
+voice:
+  enabled: false                  # disabled by default (saves ~30 MB RAM)
+  engine: "pyttsx3"
+  rate: 155
+  volume: 0.8
+
+alerts:
+  cpu_threshold: 85
+  ram_threshold: 85               # lowered from 90 (8 GB RAM, be cautious)
+  temp_threshold: 80
+  battery_threshold: 15
+  notification_method: "notify-send"  # notify-send, dbus, none

@@ -1,0 +1,110 @@
+{
+  "models": [
+    {
+      "title": "Linux-AI Agent (7B, Tool-Calling)",
+      "provider": "ollama",
+      "model": "linux-ai-agent",
+      "apiBase": "http://localhost:11434",
+      "completionOptions": {
+        "temperature": 0.2,
+        "topP": 0.85,
+        "maxTokens": 4096
+      }
+    },
+    {
+      "title": "Linux-AI Coder (3B)",
+      "provider": "ollama",
+      "model": "linux-ai-coder",
+      "apiBase": "http://localhost:11434",
+      "completionOptions": {
+        "temperature": 0.3,
+        "topP": 0.9,
+        "maxTokens": 2048
+      }
+    },
+    {
+      "title": "Qwen2.5-Coder 3B (Base)",
+      "provider": "ollama",
+      "model": "qwen2.5-coder:3b",
+      "apiBase": "http://localhost:11434",
+      "completionOptions": {
+        "temperature": 0.4,
+        "topP": 0.9,
+        "maxTokens": 2048
+      }
+    }
+  ],
+  "tabAutocompleteModel": {
+    "title": "Qwen Autocomplete",
+    "provider": "ollama",
+    "model": "qwen2.5-coder:3b",
+    "apiBase": "http://localhost:11434",
+    "completionOptions": {
+      "temperature": 0.1,
+      "maxTokens": 256,
+      "stop": ["\n\n", "```"]
+    }
+  },
+  "tabAutocompleteOptions": {
+    "debounceDelay": 500,
+    "maxPromptTokens": 2048,
+    "disableInFiles": ["*.md", "*.txt", "*.yml", "*.yaml", "*.json"]
+  },
+  "contextProviders": [
+    {
+      "name": "file",
+      "params": {}
+    },
+    {
+      "name": "codebase",
+      "params": {
+        "nRetrieve": 15,
+        "nFinal": 5
+      }
+    },
+    {
+      "name": "diff",
+      "params": {}
+    },
+    {
+      "name": "terminal",
+      "params": {}
+    },
+    {
+      "name": "folder",
+      "params": {}
+    }
+  ],
+  "slashCommands": [
+    {
+      "name": "edit",
+      "description": "Edit selected code"
+    },
+    {
+      "name": "comment",
+      "description": "Add comments to code"
+    },
+    {
+      "name": "share",
+      "description": "Export conversation as markdown"
+    }
+  ],
+  "customCommands": [
+    {
+      "name": "optimize",
+      "prompt": "Optimize this code for minimal memory and CPU usage. Target hardware: i7-M640 (2C/4T), 8GB RAM. Avoid unnecessary allocations, prefer stack over heap, use compact data structures.",
+      "description": "Optimize code for low-spec hardware"
+    },
+    {
+      "name": "secure",
+      "prompt": "Review this code for security issues. Check for: command injection (system(), os.system(), eval()), buffer overflows, format string bugs, TOCTOU races, improper file permissions. Fix any issues found.",
+      "description": "Security audit the selected code"
+    },
+    {
+      "name": "kernel-style",
+      "prompt": "Reformat this C code to follow Linux kernel coding style: 4-space indent, snake_case, proper header guards, no system() calls, fopen/fgets instead of shell commands. Add error checking for all system calls.",
+      "description": "Apply Linux kernel coding conventions"
+    }
+  ],
+  "allowAnonymousTelemetry": false
+}

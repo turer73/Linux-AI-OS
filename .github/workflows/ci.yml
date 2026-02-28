@@ -1,0 +1,70 @@
+name: Linux-AI CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest flake8 black
+          pip install pyttsx3 psutil PyYAML watchdog matplotlib seaborn numpy torch scikit-learn pandas
+          pip install -e .
+
+      - name: Lint with flake8
+        run: |
+          flake8 proc-utils-AI/cbinder_gbfs/ --max-line-length=120 --count --statistics
+          flake8 DE-AI/ --max-line-length=120 --count --statistics
+
+      - name: Check formatting with black
+        run: |
+          black --check --line-length=120 proc-utils-AI/cbinder_gbfs/
+          black --check --line-length=120 DE-AI/
+
+      - name: Run Python tests
+        run: |
+          pytest tests/python/ -v --tb=short
+
+  c-build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install C build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make cmake
+
+      - name: Build C test suite
+        run: |
+          gcc -o tests/c/test_cpu_buffer tests/c/test_cpu_buffer.c -I tests/c/ -Wall -Wextra
+
+      - name: Run C tests
+        run: |
+          ./tests/c/test_cpu_buffer
+
+      - name: Build project with Make
+        run: make all || true
+
+      - name: Build project with CMake
+        run: |
+          mkdir -p build && cd build
+          cmake .. && make || true

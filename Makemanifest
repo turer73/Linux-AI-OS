@@ -1,0 +1,73 @@
+<?MakeManifest version="1.0.0" format_type="multi"?>
+<MakeManifest version="1.0.0" theme="manifestsornamebyter">
+  <Metadata>
+    <Name>proc-utils-AI</Name>
+    <Version>1.0.0</Version>
+    <Description>AI-based process utilities for CPU and GPU monitoring</Description>
+    <Main>bin/Kernel-AI-cpud</Main>
+  </Metadata>
+
+  <Scripts>
+    <Build>make all</Build>
+    <Clean>make clean</Clean>
+  </Scripts>
+
+  <Dependencies>
+    <Dependency name="gcc" version=">=4.8"/>
+    <Dependency name="g++" version=">=4.8"/>
+    <Dependency name="make" version=">=3.81"/>
+    <Dependency name="linux-headers" version=">=4.15"/>
+    <Dependency name="libc6-dev" version=">=2.27"/>
+    <Dependency name="libstdc++-dev" version=">=4.8"/>
+    <Dependency name="procps" version=">=3.3.12"/>
+    <Dependency name="libc6" version=">=2.27"/>
+  </Dependencies>
+
+  <DevDependencies>
+    <DevDependency name="gcc" version=">=4.8"/>
+    <DevDependency name="g++" version=">=4.8"/>
+    <DevDependency name="make" version=">=3.81"/>
+    <DevDependency name="linux-headers" version=">=4.15"/>
+    <DevDependency name="libc6-dev" version=">=2.27"/>
+    <DevDependency name="libstdc++-dev" version=">=4.8"/>
+    <DevDependency name="procps" version=">=3.3.12"/>
+    <DevDependency name="libc6" version=">=2.27"/>
+  </DevDependencies>
+
+  <UserDefine>
+    <ByteDataSection size="2048" floatboat_encc="no"/>
+  </UserDefine>
+
+  <Defines>
+    <Define name="MAKE_MANIFEST" value="true"/>
+    <Define name="MAKE_MANIFEST_VERSION" value="1.0.0"/>
+    <Define name="CPU_SRC" value="proc-utils-AI/proc-CPUIO"/>
+    <Define name="GPU_SRC" value="proc-utils-AI/proc-GPUIO"/>
+    <Define name="KERNEL_SRC" value="proc-utils-AI/nproc-kernel"/>
+  </Defines>
+
+  <MakeCommands>
+    <Make>mkdir -p bin</Make>
+
+    <Make>
+      gcc -O2 -Wall -I proc-utils-AI/proc-CPUIO proc-utils-AI/proc-CPUIO/proc-CPUIO.c -o bin/Kernel-AI-cpud
+    </Make>
+
+    
+    <Make>
+      g++ -O2 -Wall -I proc-utils-AI/proc-GPUIO proc-utils-AI/proc-GPUIO/proc-GPUIO.cpp -o bin/kernel-AI-gpud
+    </Make>
+
+   
+    <Make>
+      gcc -O2 -Wall -I proc-utils-AI/nproc-kernel proc-utils-AI/nproc-kernel/grant_permission_revoke.c -o bin/kernel-AI-gpm
+    </Make>
+
+    <Make>
+      gcc -O2 -Wall -I proc-utils-AI/nproc-kernel proc-utils-AI/nproc-kernel/kernel-start.c -o bin/kernel-AI-start
+    </Make>
+  </MakeCommands>
+
+  <Choice prompt="manifest are you make sure?" choice_index="y/n"/>
+
+</MakeManifest>

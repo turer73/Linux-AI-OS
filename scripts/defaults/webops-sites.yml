@@ -1,0 +1,61 @@
+# Linux-AI WebOps - Site Konfigurasyonu
+# Her site icin gerekli bilgileri doldurun.
+#
+# Ortam degiskenleri:
+#   CLOUDFLARE_API_TOKEN  - Cloudflare API erisimi
+#   SUPABASE_ACCESS_TOKEN - Supabase CLI erisimi
+#   VERCEL_TOKEN          - Vercel deploy erisimi
+#   GITHUB_TOKEN          - GitHub CLI erisimi (gh auth login ile de olur)
+
+defaults:
+  framework: nextjs
+  hosting: vercel
+  cdn: cloudflare
+  db: supabase
+  monitor_interval: 300  # saniye
+
+sites:
+  renderhane.com:
+    domain: renderhane.com
+    description: "3D render ve gorsellestime platformu"
+    framework: nextjs
+    hosting: vercel
+    cdn: cloudflare
+    db: supabase
+    github_repo: ""           # Zamanhuseyinli/renderhane
+    repo_path: ""             # /home/user/projects/renderhane
+    cloudflare_zone_id: ""    # Cloudflare dashboard'dan alinir
+    supabase_project_id: ""   # Supabase dashboard'dan alinir
+    fal_ai: true              # Fal.ai AI inference kullanimi
+    huggingface: true         # HuggingFace model hosting
+
+  kokenakademi.com:
+    domain: kokenakademi.com
+    description: "Egitim ve akademi platformu"
+    framework: nextjs
+    hosting: vercel
+    cdn: cloudflare
+    db: supabase
+    github_repo: ""
+    repo_path: ""
+    cloudflare_zone_id: ""
+    supabase_project_id: ""
+
+  3d-labx.com:
+    domain: 3d-labx.com
+    description: "3D laboratuvar - oyunlar ve araclar"
+    framework: nextjs
+    hosting: vercel
+    cdn: cloudflare
+    db: supabase
+    github_repo: ""
+    repo_path: ""
+    cloudflare_zone_id: ""
+    supabase_project_id: ""
+    games:
+      - name: "Kelime Fethi"
+        platform: ["web", "google-play"]
+        status: "gelistirme"
+      - name: "Tikla Fethet"
+        platform: ["web", "google-play"]
+        status: "gelistirme"
