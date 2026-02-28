@@ -40,6 +40,7 @@ setup(
             'ai-backup=cbinder_gbfs.ai_backup:main',
             'ai-logs=cbinder_gbfs.ai_logs:main',
             'ai-dashboard=cbinder_gbfs.ai_dashboard:main',
+            'ai-help=cbinder_gbfs.ai_help:main',
         ],
     },
     python_requires='>=3.8',
