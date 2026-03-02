@@ -3,6 +3,39 @@
 Tum onemli degisiklikler bu dosyada belgelenir.
 Format [Keep a Changelog](https://keepachangelog.com/) standardina uygundur.
 
+## [0.3.3] - 2026-03-02
+
+### Guvenlik
+- `ai_greeting.py`: `os.system()` -> `subprocess.run()` (komut enjeksiyonu riski giderildi)
+- `gpu_model_runner.hpp`: `popen("lspci")` ve `popen("which")` -> sysfs tabanli algilama (shell injection riski giderildi)
+
+### GPU Modulu - sysfs Tabanli Izleme
+- `gpu_sysfs_monitor.hpp`: Yeni pure-sysfs GPU izleme modulu (sifir subprocess cagrisi)
+  - PCI vendor ID ile GPU algilama (`/sys/class/drm/cardN/device/vendor`)
+  - AMD: gpu_busy_percent, VRAM, power, clock sysfs okuma
+  - Intel: gt_cur_freq, gt_max_freq, hwmon sicaklik
+  - NVIDIA: nvidia-smi fallback (dosya erisim kontrolu ile)
+- `gpu_model_runner.hpp`: `detect_gpu_vendor()` sysfs tabanli yeniden yazildi
+- `gpu_model_runner.hpp`: `read_amd_metrics()`/`read_intel_metrics()` -> birlesik `read_sysfs_metrics()`
+
+### Test Altyapisi
+- 7 yeni test dosyasi: test_ai_webops, test_compressed_log, test_quantize_model, test_ai_browser_agent, test_ai_cpufregd_affinity, test_ai_dashboard, test_ai_lfs, test_ai_monitor
+- 253 test (253 passed, 2 skipped) - onceki: 96 test (%163 artis)
+- Modul bazli kapsam: compressed_log %86, simulate_io %95, ai_affinity %69, ai_analyzer %77
+- Toplam kapsam: %28 (daemon main-loop modulleri unit test kapsaminda degil)
+
+### CI/CD Iyilestirmeleri
+- `pytest.ini`: pytest-cov entegrasyonu (`--cov=cbinder_gbfs --cov-report=term-missing --cov-fail-under=25`)
+- `ci.yml`: Coverage raporlama ve artifact upload eklendi
+- `Dockerfile`: Ubuntu 22.04 tabanli gelistirme/test container'i eklendi
+
+### Duzeltilen
+- `test_ai_webops.py`: CONFIG_PATHS IndexError (tek elemanli liste -> 2 elemanli fallback)
+- `test_ai_webops.py`: Windows'ta PermissionError testi (mock builtins.open)
+- `test_ai_webops.py`: save_config fallback yolu dogrulama hatasi duzeltildi
+
+---
+
 ## [0.3.2] - 2026-03-02
 
 ### Performans - Minimum Donanim, Maksimum Performans

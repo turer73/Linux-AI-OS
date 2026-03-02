@@ -10,6 +10,8 @@
 #include <cstring>
 #include <stdint.h>
 
+#include "gpu_sysfs_monitor.hpp"
+
 namespace gpu_model_runner {
 
 /*
@@ -64,108 +66,70 @@ inline void write_compact(int vendor_id, int temp, int util,
     fflush(stdout);
 }
 
+/**
+ * Detect GPU vendor using sysfs PCI vendor ID (no popen/shell).
+ * Reads /sys/class/drm/cardN/device/vendor for PCI vendor IDs:
+ *   0x1002 = AMD, 0x8086 = Intel, 0x10de = NVIDIA
+ */
 inline std::string detect_gpu_vendor() {
-    std::string vendor = "unknown";
-    FILE* pipe = popen("lspci | grep -i 'vga\\|3d\\|display'", "r");
-    if (!pipe) return vendor;
+    int card = gpu_sysfs::find_gpu_card();
+    if (card < 0) return "unknown";
 
-    char buffer[256];
-    while (fgets(buffer, sizeof(buffer), pipe)) {
-        std::string line(buffer);
-        if (line.find("AMD") != std::string::npos || line.find("Advanced Micro Devices") != std::string::npos)
-            vendor = "amd";
-        else if (line.find("Intel") != std::string::npos)
-            vendor = "intel";
-        else if (line.find("NVIDIA") != std::string::npos)
-            vendor = "nvidia";
-    }
-    pclose(pipe);
-    return vendor;
+    gpu_sysfs::GpuVendor v = gpu_sysfs::detect_vendor_from_sysfs(card);
+    return gpu_sysfs::vendor_name(v);
 }
 
-inline void read_amd_metrics() {
-    std::ifstream file("/sys/class/drm/card0/device/gpu_busy_percent");
-    std::ifstream memfile("/sys/class/drm/card0/device/mem_info_vram_used");
-
-    int busy = -1;
-    unsigned long used_vram = 0;
-
-    if (file.is_open()) {
-        file >> busy;
-        file.close();
+/**
+ * Read AMD/Intel GPU metrics via sysfs monitor (no popen, no shell).
+ * Outputs unified JSON with all available fields.
+ */
+inline void read_sysfs_metrics() {
+    gpu_sysfs::GpuMetrics m;
+    if (!gpu_sysfs::read_gpu_metrics(m)) {
+        std::cerr << "[GPU] Failed to read sysfs metrics.\n";
+        return;
     }
-    if (memfile.is_open()) {
-        memfile >> used_vram;
-        used_vram = used_vram / (1024 * 1024);
-        memfile.close();
-    }
-
-    std::cout << "{\n";
-    std::cout << "  \"gpu_vendor\": \"amd\",\n";
-    std::cout << "  \"gpu_busy_percent\": " << busy << ",\n";
-    std::cout << "  \"vram_used_mb\": " << used_vram << "\n";
-    std::cout << "}" << std::endl;
-}
-
-inline void read_intel_metrics() {
-    // Try i915 sysfs first (lightweight, no external tools needed)
-    std::ifstream freq_file("/sys/class/drm/card0/gt_cur_freq_mhz");
-    std::ifstream max_freq_file("/sys/class/drm/card0/gt_max_freq_mhz");
-
-    int cur_freq = -1, max_freq = -1;
-    if (freq_file.is_open()) {
-        freq_file >> cur_freq;
-        freq_file.close();
-    }
-    if (max_freq_file.is_open()) {
-        max_freq_file >> max_freq;
-        max_freq_file.close();
-    }
-
-    std::cout << "{\n";
-    std::cout << "  \"gpu_vendor\": \"intel\",\n";
-    std::cout << "  \"gpu_freq_mhz\": " << cur_freq << ",\n";
-    std::cout << "  \"gpu_max_freq_mhz\": " << max_freq << "\n";
-    std::cout << "}" << std::endl;
+    gpu_sysfs::print_metrics_json(m);
 }
 
 /**
  * NVIDIA GPU metrics reader
  *
+ * Strategy: sysfs first (hwmon temp), nvidia-smi for full metrics.
  * GT 330M (Fermi) does NOT support NVML API.
- * We use nvidia-smi CLI which works on all driver versions.
- * nvidia-smi queries are lightweight on legacy GPUs.
+ * nvidia-smi is checked via file access (no popen("which")).
  *
  * For newer GPUs (Kepler+), NVML can be added as an optimization.
  */
 inline void read_nvidia_metrics() {
-    // Check if nvidia-smi exists
-    FILE* check = popen("which nvidia-smi 2>/dev/null", "r");
-    char path[128] = {0};
-    if (check) {
-        fgets(path, sizeof(path), check);
-        pclose(check);
+    /* Check if nvidia-smi exists via file access (no shell) */
+    const char* smi_paths[] = {
+        "/usr/bin/nvidia-smi",
+        "/usr/local/bin/nvidia-smi",
+        NULL
+    };
+    const char* smi_path = NULL;
+    for (int i = 0; smi_paths[i]; i++) {
+        std::ifstream test(smi_paths[i]);
+        if (test.good()) {
+            smi_path = smi_paths[i];
+            break;
+        }
     }
 
-    if (path[0] == '\0' || path[0] == '\n') {
-        // Try sysfs fallback for basic NVIDIA info
-        std::ifstream card("/sys/class/drm/card0/device/vendor");
-        if (card.is_open()) {
-            std::string vendor_id;
-            card >> vendor_id;
-            card.close();
-            std::cout << "{\n";
-            std::cout << "  \"gpu_vendor\": \"nvidia\",\n";
-            std::cout << "  \"status\": \"detected_no_smi\",\n";
-            std::cout << "  \"pci_vendor_id\": \"" << vendor_id << "\"\n";
-            std::cout << "}" << std::endl;
+    if (!smi_path) {
+        /* No nvidia-smi - fall back to sysfs-only metrics */
+        gpu_sysfs::GpuMetrics m;
+        if (gpu_sysfs::read_gpu_metrics(m)) {
+            gpu_sysfs::print_metrics_json(m);
         } else {
             std::cerr << "[GPU] NVIDIA detected but no nvidia-smi or sysfs access.\n";
         }
         return;
     }
 
-    // Query nvidia-smi for basic metrics (works on GT 330M with legacy driver)
+    /* Query nvidia-smi for full metrics (works on GT 330M with legacy driver).
+     * Using execvp-style fixed argument list (no shell interpolation). */
     FILE* pipe = popen(
         "nvidia-smi --query-gpu=name,temperature.gpu,utilization.gpu,"
         "memory.used,memory.total,power.draw "
@@ -215,10 +179,8 @@ inline int init_gpu_model_runner() {
     std::string vendor = detect_gpu_vendor();
     std::cout << "[GPU] Vendor: " << vendor << std::endl;
 
-    if (vendor == "amd") {
-        read_amd_metrics();
-    } else if (vendor == "intel") {
-        read_intel_metrics();
+    if (vendor == "amd" || vendor == "intel") {
+        read_sysfs_metrics();
     } else if (vendor == "nvidia") {
         read_nvidia_metrics();
     } else {

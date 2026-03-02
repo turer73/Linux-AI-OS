@@ -1,7 +1,12 @@
-import pyttsx3
+import subprocess
 import os
 import time
 from datetime import datetime
+
+try:
+    import pyttsx3
+except ImportError:
+    pyttsx3 = None
 
 TMP_AUDIO_PATH = "/tmp/ai-greeting.wav"
 
@@ -15,6 +20,8 @@ def get_greeting():
         return "Hello tonight. The night is here."
 
 def init_robot_voice():
+    if pyttsx3 is None:
+        raise ImportError("pyttsx3 required: pip install pyttsx3")
     engine = pyttsx3.init()
     engine.setProperty('rate', 150)
     engine.setProperty('volume', 0.85)
@@ -35,13 +42,26 @@ def generate_temp_audio(text, path):
     engine.runAndWait()
 
 def play_temp_audio(path):
-    # Platforma göre oynatıcı seç
+    """Play audio file using platform-appropriate player (no shell injection)."""
+    if not os.path.isfile(path):
+        print(f"Ses dosyasi bulunamadi: {path}")
+        return
     if os.name == "posix":
-        os.system(f"aplay {path} >/dev/null 2>&1 || paplay {path} >/dev/null 2>&1")
+        result = subprocess.run(
+            ["aplay", path], capture_output=True, timeout=10, check=False
+        )
+        if result.returncode != 0:
+            subprocess.run(
+                ["paplay", path], capture_output=True, timeout=10, check=False
+            )
     elif os.name == "nt":
-        os.system(f'start /min wmplayer "{path}"')
+        subprocess.run(
+            ["powershell", "-WindowStyle", "Hidden", "-Command",
+             f'(New-Object Media.SoundPlayer "{path}").PlaySync()'],
+            capture_output=True, timeout=10, check=False
+        )
     else:
-        print("Ses çalma yöntemi tanımlanmadı.")
+        print("Ses calma yontemi tanimlanmadi.")
 
 def main():
     greeting = get_greeting()
