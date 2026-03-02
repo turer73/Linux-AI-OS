@@ -91,13 +91,17 @@ class CompressedLogger:
     LABEL_MAP = {"IDLE": 0, "READ_FOCUS": 1, "WRITE_PRIORITY": 2, "OPTIMIZE_BALANCE": 3}
     LABEL_REVERSE = {v: k for k, v in LABEL_MAP.items()}
 
+    FLUSH_EVERY = 10  # flush to disk every N entries (balances durability vs perf)
+
     def __init__(self, base_name, max_size_mb=5):
         self.base_name = base_name
         self.gz_path = f"{base_name}.csv.gz"
         self.max_size_bytes = max_size_mb * 1024 * 1024
         self.encoder = DeltaEncoder()
         self.entry_count = 0
+        self._fh = None
         self._ensure_header()
+        self._open_handle()
 
     def _ensure_header(self):
         """Create file with header if it doesn't exist."""
@@ -105,15 +109,26 @@ class CompressedLogger:
             with gzip.open(self.gz_path, "wt") as f:
                 f.write("timestamp,is_delta,read_bytes,write_bytes,decision_id,run_count\n")
 
+    def _open_handle(self):
+        """Open persistent gzip handle for appending."""
+        if self._fh is not None:
+            try:
+                self._fh.close()
+            except Exception:
+                pass
+        self._fh = gzip.open(self.gz_path, "at")
+
     def _check_rotation(self):
         """Rotate log if it exceeds max size."""
         if os.path.exists(self.gz_path):
             size = os.path.getsize(self.gz_path)
             if size > self.max_size_bytes:
+                self.close()  # close handle before rename
                 rotated = f"{self.base_name}.{int(time.time())}.csv.gz"
                 os.rename(self.gz_path, rotated)
                 self._ensure_header()
                 self.encoder.reset()
+                self._open_handle()  # reopen on new file
                 print(f"[compressed_log] Rotated to {rotated}")
 
     def write(self, io_data, decision):
@@ -129,21 +144,48 @@ class CompressedLogger:
         decision_id = self.LABEL_MAP.get(decision, 0)
         ts = datetime.now().strftime("%H:%M:%S")  # short timestamp (saves ~10 bytes)
 
-        with gzip.open(self.gz_path, "at") as f:
-            # Skip writing if this is a run continuation (RLE)
-            if run_count > 2 and is_delta and encoded == [0, 0]:
-                # Only write every 5th repeated entry to save space
-                if run_count % 5 == 0:
-                    f.write(f"{ts},R,0,0,{decision_id},{run_count}\n")
-            else:
-                d = 1 if is_delta else 0
-                f.write(f"{ts},{d},{encoded[0]},{encoded[1]},{decision_id},{run_count}\n")
+        # Skip writing if this is a run continuation (RLE)
+        if run_count > 2 and is_delta and encoded == [0, 0]:
+            # Only write every 5th repeated entry to save space
+            if run_count % 5 == 0:
+                self._fh.write(f"{ts},R,0,0,{decision_id},{run_count}\n")
+        else:
+            d = 1 if is_delta else 0
+            self._fh.write(f"{ts},{d},{encoded[0]},{encoded[1]},{decision_id},{run_count}\n")
 
         self.entry_count += 1
 
+        # Periodic flush for durability (every 10 entries instead of every write)
+        if self.entry_count % self.FLUSH_EVERY == 0:
+            self.flush()
+
+    def flush(self):
+        """Flush gzip buffer to disk."""
+        if self._fh is not None:
+            try:
+                self._fh.flush()
+            except Exception:
+                pass
+
+    def close(self):
+        """Close the persistent gzip handle."""
+        if self._fh is not None:
+            try:
+                self._fh.close()
+            except Exception:
+                pass
+            self._fh = None
+
     def read_all(self):
         """Read and decompress all entries back to absolute values."""
+        # Close write handle so gzip stream is finalized before reading
+        was_open = self._fh is not None
+        if was_open:
+            self.close()
+
         if not os.path.exists(self.gz_path):
+            if was_open:
+                self._open_handle()
             return []
 
         entries = []
@@ -193,6 +235,10 @@ class CompressedLogger:
                         "run": run
                     })
 
+        # Reopen write handle if it was open before reading
+        if was_open:
+            self._open_handle()
+
         return entries
 
     def stats(self):
@@ -238,10 +284,14 @@ class BinaryMetricWriter:
     STRUCT_FMT = "<IHHBBBBHHI I"  # little-endian, 24 bytes
     ENTRY_SIZE = struct.calcsize("<IHHBBBBHHiI")  # using signed for delta
 
+    FLUSH_EVERY = 10
+
     def __init__(self, path):
         self.path = path
         self.prev_read = 0
         self.prev_write = 0
+        self._fh = open(self.path, "ab")
+        self._write_count = 0
 
     def write(self, metrics):
         """Write a single metrics entry in binary.
@@ -271,8 +321,24 @@ class BinaryMetricWriter:
                              ts, read_kb, write_kb, cpu, ram, temp, dec,
                              freq, gpu_t, rd_delta, wr_delta)
 
-        with open(self.path, "ab") as f:
-            f.write(packed)
+        self._fh.write(packed)
+        self._write_count += 1
+        if self._write_count % self.FLUSH_EVERY == 0:
+            self._fh.flush()
+
+    def flush(self):
+        """Flush binary buffer to disk."""
+        if self._fh is not None:
+            self._fh.flush()
+
+    def close(self):
+        """Close the persistent binary handle."""
+        if self._fh is not None:
+            try:
+                self._fh.close()
+            except Exception:
+                pass
+            self._fh = None
 
     def read_all(self):
         """Read all binary entries."""

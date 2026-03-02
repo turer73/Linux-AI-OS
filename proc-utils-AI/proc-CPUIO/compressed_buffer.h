@@ -34,31 +34,57 @@
 #include <stdint.h>
 #include <time.h>
 #include <pthread.h>
+#include "governor_ids.h"
 
 #define CB_MAX_ENTRIES 128   /* 128 * 16 = 2048 bytes total (vs 128*144 = 18 KB) */
 #define CB_CONFIG_PATH "/var/AI-stump/AI-runtime.yml"
 
-/* 16-byte packed entry */
+/* 16-byte packed entry (verified by static assert below) */
 typedef struct __attribute__((packed)) {
     uint32_t timestamp_ms;     /* relative ms from epoch_ms */
     uint8_t  cpu_percent;      /* 0-100 (7 bits used, 1 bit for delta flag) */
     uint16_t cpu_freq_mhz;     /* 0-4095 (12 bits) + temp high nibble */
     uint8_t  cpu_temp;         /* 0-127 */
-    uint32_t io_read_kb;       /* 20 bits used */
-    uint32_t io_write_kb;      /* 20 bits used */
+    uint8_t  io_packed[5];     /* 2x 20-bit IO values packed into 5 bytes */
     uint8_t  flags;            /* governor:3 | turbo:1 | alert:1 | delta:1 | rsv:2 */
+    uint8_t  reserved[2];      /* pad to exactly 16 bytes */
 } packed_entry_t;
+
+_Static_assert(sizeof(packed_entry_t) == 16, "packed_entry_t must be 16 bytes");
+
+/* Pack two 20-bit IO values into 5 bytes */
+static inline void cb_set_io(packed_entry_t *e, uint32_t read_kb, uint32_t write_kb) {
+    read_kb  &= 0xFFFFF;  /* clamp to 20 bits */
+    write_kb &= 0xFFFFF;
+    e->io_packed[0] = (uint8_t)(read_kb >> 12);
+    e->io_packed[1] = (uint8_t)(read_kb >> 4);
+    e->io_packed[2] = (uint8_t)((read_kb & 0xF) << 4) | (uint8_t)(write_kb >> 16);
+    e->io_packed[3] = (uint8_t)(write_kb >> 8);
+    e->io_packed[4] = (uint8_t)(write_kb);
+}
+
+static inline uint32_t cb_get_read_kb(const packed_entry_t *e) {
+    return ((uint32_t)e->io_packed[0] << 12)
+         | ((uint32_t)e->io_packed[1] << 4)
+         | ((uint32_t)e->io_packed[2] >> 4);
+}
+
+static inline uint32_t cb_get_write_kb(const packed_entry_t *e) {
+    return ((uint32_t)(e->io_packed[2] & 0x0F) << 16)
+         | ((uint32_t)e->io_packed[3] << 8)
+         | ((uint32_t)e->io_packed[4]);
+}
 
 /* Uncompressed metrics for easy population */
 typedef struct {
-    int    cpu_percent;        /* 0-100 */
-    int    cpu_freq_mhz;       /* 0-4095 */
-    int    cpu_temp;           /* 0-127 */
-    unsigned long io_read_kb;  /* delta or absolute */
-    unsigned long io_write_kb;
-    int    governor_id;        /* 0-7 */
-    int    turbo;              /* 0 or 1 */
-    int    alert;              /* 0 or 1 */
+    int      cpu_percent;      /* 0-100 */
+    int      cpu_freq_mhz;    /* 0-4095 */
+    int      cpu_temp;         /* 0-127 */
+    uint32_t io_read_kb;       /* delta or absolute (20-bit range) */
+    uint32_t io_write_kb;
+    int      governor_id;      /* 0-7 */
+    int      turbo;            /* 0 or 1 */
+    int      alert;            /* 0 or 1 */
 } raw_metrics_t;
 
 /* Compressed circular buffer state */
@@ -71,31 +97,7 @@ static raw_metrics_t cb_prev_metrics;
 static int cb_has_prev = 0;
 static pthread_mutex_t cb_lock = PTHREAD_MUTEX_INITIALIZER;
 
-/* Governor string → ID mapping */
-static int governor_to_id(const char *gov) {
-    if (!gov) return 0;
-    if (strcmp(gov, "performance") == 0)   return 1;
-    if (strcmp(gov, "powersave") == 0)     return 2;
-    if (strcmp(gov, "schedutil") == 0)     return 3;
-    if (strcmp(gov, "ondemand") == 0)      return 4;
-    if (strcmp(gov, "conservative") == 0)  return 5;
-    if (strcmp(gov, "userspace") == 0)     return 6;
-    if (strcmp(gov, "ai-adaptive") == 0)   return 7;
-    return 0;
-}
-
-static const char* id_to_governor(int id) {
-    switch (id) {
-        case 1: return "performance";
-        case 2: return "powersave";
-        case 3: return "schedutil";
-        case 4: return "ondemand";
-        case 5: return "conservative";
-        case 6: return "userspace";
-        case 7: return "ai-adaptive";
-        default: return "unknown";
-    }
-}
+/* Governor mapping now in governor_ids.h (single source of truth) */
 
 static uint64_t get_ms(void) {
     struct timespec ts;
@@ -106,10 +108,11 @@ static uint64_t get_ms(void) {
 /* Clamp helpers */
 static inline uint8_t  clamp8(int v, int lo, int hi)  { return (uint8_t)(v < lo ? lo : (v > hi ? hi : v)); }
 static inline uint16_t clamp16(int v, int lo, int hi)  { return (uint16_t)(v < lo ? lo : (v > hi ? hi : v)); }
-static inline uint32_t clamp32(unsigned long v, unsigned long hi) { return (uint32_t)(v > hi ? hi : v); }
+static inline uint32_t clamp32(uint32_t v, uint32_t hi) { return v > hi ? hi : v; }
 
 int cb_init(void) {
-    cb_entries = (packed_entry_t *)calloc(CB_MAX_ENTRIES, sizeof(packed_entry_t));
+    /* Allocate at runtime size instead of CB_MAX_ENTRIES (50% savings) */
+    cb_entries = (packed_entry_t *)calloc(cb_max, sizeof(packed_entry_t));
     if (!cb_entries) {
         perror("[compressed_buffer] alloc failed");
         return -1;
@@ -120,9 +123,9 @@ int cb_init(void) {
     cb_write_idx = 0;
     cb_count = 0;
 
-    size_t total_bytes = CB_MAX_ENTRIES * sizeof(packed_entry_t);
+    size_t total_bytes = cb_max * sizeof(packed_entry_t);
     printf("[compressed_buffer] Init: %d entries x %zu bytes = %zu bytes total\n",
-           CB_MAX_ENTRIES, sizeof(packed_entry_t), total_bytes);
+           cb_max, sizeof(packed_entry_t), total_bytes);
     printf("[compressed_buffer] Compression: 144 -> %zu bytes/entry (%.1fx)\n",
            sizeof(packed_entry_t), 144.0 / sizeof(packed_entry_t));
 
@@ -143,8 +146,8 @@ void cb_push(const raw_metrics_t *m) {
         int d_cpu  = m->cpu_percent  - cb_prev_metrics.cpu_percent;
         int d_freq = m->cpu_freq_mhz - cb_prev_metrics.cpu_freq_mhz;
         int d_temp = m->cpu_temp     - cb_prev_metrics.cpu_temp;
-        long d_rd  = (long)m->io_read_kb  - (long)cb_prev_metrics.io_read_kb;
-        long d_wr  = (long)m->io_write_kb - (long)cb_prev_metrics.io_write_kb;
+        int32_t d_rd = (int32_t)m->io_read_kb  - (int32_t)cb_prev_metrics.io_read_kb;
+        int32_t d_wr = (int32_t)m->io_write_kb - (int32_t)cb_prev_metrics.io_write_kb;
 
         /* Use delta if values fit in smaller range (common case) */
         if (d_cpu >= -50 && d_cpu <= 50 &&
@@ -153,24 +156,27 @@ void cb_push(const raw_metrics_t *m) {
             e.cpu_percent  = clamp8(d_cpu + 50, 0, 100);   /* offset by 50 */
             e.cpu_freq_mhz = clamp16(d_freq + 2048, 0, 4095);
             e.cpu_temp     = clamp8(d_temp + 63, 0, 127);
-            e.io_read_kb   = clamp32(d_rd < 0 ? 0 : (unsigned long)d_rd, 1048575);
-            e.io_write_kb  = clamp32(d_wr < 0 ? 0 : (unsigned long)d_wr, 1048575);
+            cb_set_io(&e,
+                      clamp32((uint32_t)(d_rd < 0 ? 0 : d_rd), 1048575),
+                      clamp32((uint32_t)(d_wr < 0 ? 0 : d_wr), 1048575));
             e.flags |= (1 << 5); /* delta_mode = 1 */
         } else {
             /* Absolute values (delta too large) */
             e.cpu_percent  = clamp8(m->cpu_percent, 0, 100);
             e.cpu_freq_mhz = clamp16(m->cpu_freq_mhz, 0, 4095);
             e.cpu_temp     = clamp8(m->cpu_temp, 0, 127);
-            e.io_read_kb   = clamp32(m->io_read_kb, 1048575);
-            e.io_write_kb  = clamp32(m->io_write_kb, 1048575);
+            cb_set_io(&e,
+                      clamp32(m->io_read_kb, 1048575),
+                      clamp32(m->io_write_kb, 1048575));
         }
     } else {
         /* First entry: always absolute */
         e.cpu_percent  = clamp8(m->cpu_percent, 0, 100);
         e.cpu_freq_mhz = clamp16(m->cpu_freq_mhz, 0, 4095);
         e.cpu_temp     = clamp8(m->cpu_temp, 0, 127);
-        e.io_read_kb   = clamp32(m->io_read_kb, 1048575);
-        e.io_write_kb  = clamp32(m->io_write_kb, 1048575);
+        cb_set_io(&e,
+                  clamp32(m->io_read_kb, 1048575),
+                  clamp32(m->io_write_kb, 1048575));
     }
 
     e.flags |= (m->governor_id & 0x7);         /* bits 0-2: governor */
@@ -230,20 +236,23 @@ void cb_print_entries(void) {
         int alert    = (e->flags >> 4) & 1;
 
         int cpu, freq, temp;
-        unsigned long rd, wr;
+        uint32_t rd, wr;
+
+        uint32_t e_rd = cb_get_read_kb(e);
+        uint32_t e_wr = cb_get_write_kb(e);
 
         if (is_delta) {
             cpu  = (int)e->cpu_percent - 50 + reconstructed.cpu_percent;
             freq = (int)e->cpu_freq_mhz - 2048 + reconstructed.cpu_freq_mhz;
             temp = (int)e->cpu_temp - 63 + reconstructed.cpu_temp;
-            rd   = e->io_read_kb + reconstructed.io_read_kb;
-            wr   = e->io_write_kb + reconstructed.io_write_kb;
+            rd   = e_rd + reconstructed.io_read_kb;
+            wr   = e_wr + reconstructed.io_write_kb;
         } else {
             cpu  = e->cpu_percent;
             freq = e->cpu_freq_mhz;
             temp = e->cpu_temp;
-            rd   = e->io_read_kb;
-            wr   = e->io_write_kb;
+            rd   = e_rd;
+            wr   = e_wr;
         }
 
         reconstructed.cpu_percent  = cpu;
@@ -252,7 +261,7 @@ void cb_print_entries(void) {
         reconstructed.io_read_kb   = rd;
         reconstructed.io_write_kb  = wr;
 
-        printf("[%3d] %8u ms | CPU:%3d%% %4d MHz %3dC | IO R:%lu W:%lu KB | %s%s%s\n",
+        printf("[%3d] %8u ms | CPU:%3d%% %4d MHz %3dC | IO R:%u W:%u KB | %s%s%s\n",
                n, e->timestamp_ms,
                cpu, freq, temp, rd, wr,
                id_to_governor(gov_id),

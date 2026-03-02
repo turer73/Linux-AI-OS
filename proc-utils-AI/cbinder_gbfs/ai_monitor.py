@@ -44,6 +44,8 @@ SITES_PATH = "/var/AI-stump/webops-sites.yml"
 LOG_PATH = "/var/AI-stump/ai-monitor.log"
 
 DEFAULT_CHECK_INTERVAL = 300  # 5 minutes
+MAX_MEMORY_MB = 200  # max RSS for this daemon process
+
 DEFAULT_ALERT_THRESHOLDS = {
     "cpu_percent": 85,
     "ram_percent": 85,
@@ -51,6 +53,19 @@ DEFAULT_ALERT_THRESHOLDS = {
     "temp_celsius": 80,
     "response_time_ms": 3000,
 }
+
+
+# --- Memory Watchdog ---
+
+def _check_memory():
+    """Warn and trigger GC if process exceeds memory limit."""
+    rss_mb = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
+    if rss_mb > MAX_MEMORY_MB:
+        import gc
+        gc.collect()
+        rss_after = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
+        print(f"{YELLOW}{TAG} UYARI: Bellek {rss_mb:.0f}MB -> {rss_after:.0f}MB (limit: {MAX_MEMORY_MB}MB){NC}")
+    return rss_mb
 
 
 # --- Utility ---
@@ -438,6 +453,7 @@ def run_monitor_loop(interval=DEFAULT_CHECK_INTERVAL):
     info("Durdurmak icin Ctrl+C")
     log_event("INFO", "Monitor started")
 
+    cycle = 0
     while True:
         try:
             sys_status, sys_alerts = check_system()
@@ -452,6 +468,11 @@ def run_monitor_loop(interval=DEFAULT_CHECK_INTERVAL):
                     send_notification(alert)
             else:
                 log_event("INFO", "All checks passed")
+
+            cycle += 1
+            # Memory watchdog every 12 cycles (~1 hour at default interval)
+            if cycle % 12 == 0:
+                _check_memory()
 
             time.sleep(interval)
 

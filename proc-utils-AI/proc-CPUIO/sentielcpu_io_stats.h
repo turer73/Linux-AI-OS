@@ -16,7 +16,7 @@
 static void print_sentielcpu_io_stats(void) {
     uint64_t total_read_sectors = 0;
     uint64_t total_write_sectors = 0;
-    char line[512];
+    char line[256];
     FILE *fp;
 
     /* Try /proc/diskstats first (system-wide disk I/O) */

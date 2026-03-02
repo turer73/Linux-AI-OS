@@ -30,7 +30,7 @@ import json
 import glob
 import argparse
 from datetime import datetime, timedelta
-from collections import defaultdict
+from collections import defaultdict, deque
 
 # --- Constants ---
 
@@ -141,11 +141,11 @@ def read_log_file(filepath, source_name, limit=0, level_filter="", search=""):
 
     try:
         with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-
-        # Read from end if limit specified
-        if limit > 0:
-            lines = lines[-limit:]
+            # Use deque for memory-efficient tail (O(limit) vs O(file_size))
+            if limit > 0:
+                lines = deque(f, maxlen=limit)
+            else:
+                lines = f
 
         for line in lines:
             entry = parse_log_line(line, source_name)
@@ -345,7 +345,7 @@ def cmd_stats(args):
         size = os.path.getsize(filepath)
         total_size += size
 
-        entries = read_log_file(filepath, source_name)
+        entries = read_log_file(filepath, source_name, limit=10000)
         count = len(entries)
         total_lines += count
         source_counts[source_name] = count
@@ -428,12 +428,12 @@ def cmd_clean(args):
             continue
 
         try:
-            with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-                lines = f.readlines()
-
-            original = len(lines)
+            # Streaming read: process line by line instead of loading all into RAM
+            original = 0
             kept = []
-            for line in lines:
+            with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    original += 1
                 entry = parse_log_line(line, source_name)
                 if entry and entry.timestamp:
                     if entry.timestamp >= cutoff_str:

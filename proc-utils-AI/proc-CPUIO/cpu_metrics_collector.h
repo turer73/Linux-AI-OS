@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
+#include "governor_ids.h"
 
 #define MAX_BUF 256
 
@@ -10,7 +11,7 @@ typedef struct {
     float cpu_using;
     int cpu_freq_mhz;
     int cpu_temp_celsius;
-    char policy[64];
+    char policy[16];  /* governor names max 12 chars */
     int turbo_enabled;
 } cpu_metrics_t;
 
@@ -27,14 +28,8 @@ typedef struct __attribute__((packed)) {
 
 static int compact_cpu_mode = 0;
 
-static int policy_to_id(const char *p) {
-    if (strcmp(p, "performance") == 0)   return 1;
-    if (strcmp(p, "powersave") == 0)     return 2;
-    if (strcmp(p, "schedutil") == 0)     return 3;
-    if (strcmp(p, "ondemand") == 0)      return 4;
-    if (strcmp(p, "conservative") == 0)  return 5;
-    return 0;
-}
+/* Governor mapping now in governor_ids.h (single source of truth) */
+#define policy_to_id governor_to_id
 
 static void print_compact_metrics(cpu_metrics_t *m) {
     cpu_compact_t c;

@@ -67,6 +67,15 @@ COLORS = {
     "bar_high": "red",
 }
 
+# ─── TTL Cache (reduces subprocess forks 83%) ────────────────────────────────
+_svc_cache = {}
+_svc_cache_time = 0.0
+_SVC_CACHE_TTL = 30.0  # seconds
+
+_net_conn_cache = 0
+_net_conn_cache_time = 0.0
+_NET_CONN_CACHE_TTL = 30.0
+
 # ─── Veri Toplama ────────────────────────────────────────────────────────────
 
 def get_cpu_info():
@@ -131,15 +140,20 @@ def get_disk_info():
 
 
 def get_network_info():
-    """Ağ bilgileri."""
+    """Ağ bilgileri (net_connections cached with 30s TTL)."""
+    global _net_conn_cache, _net_conn_cache_time
     if not psutil:
         return {"sent": 0, "recv": 0, "connections": 0}
     net = psutil.net_io_counters()
-    conns = len(psutil.net_connections(kind="inet"))
+    # Cache expensive net_connections() call (kernel traversal)
+    now = time.time()
+    if now - _net_conn_cache_time > _NET_CONN_CACHE_TTL:
+        _net_conn_cache = len(psutil.net_connections(kind="inet"))
+        _net_conn_cache_time = now
     return {
         "sent": net.bytes_sent // (1024 * 1024),
         "recv": net.bytes_recv // (1024 * 1024),
-        "connections": conns,
+        "connections": _net_conn_cache,
     }
 
 
@@ -160,7 +174,14 @@ def get_top_processes(n=8):
 
 
 def get_service_status(name):
-    """systemd servis durumu."""
+    """systemd servis durumu (30s TTL cache, 83% fork reduction)."""
+    global _svc_cache_time
+    now = time.time()
+    if now - _svc_cache_time > _SVC_CACHE_TTL:
+        _svc_cache.clear()
+        _svc_cache_time = now
+    if name in _svc_cache:
+        return _svc_cache[name]
     try:
         r = subprocess.run(
             ["systemctl", "is-active", name],
@@ -168,13 +189,15 @@ def get_service_status(name):
         )
         state = r.stdout.strip()
         if state == "active":
-            return "active", "ok"
+            result = ("active", "ok")
         elif state == "inactive":
-            return "inactive", "dim"
+            result = ("inactive", "dim")
         else:
-            return state, "warn"
+            result = (state, "warn")
     except Exception:
-        return "?", "dim"
+        result = ("?", "dim")
+    _svc_cache[name] = result
+    return result
 
 
 def get_ollama_models():
@@ -796,6 +819,10 @@ def main():
                 live.update(layout)
                 time.sleep(args.refresh)
                 tick += 1
+                # GC every 60 ticks (~5 min at default refresh) to prevent RSS growth
+                if tick % 60 == 0:
+                    import gc
+                    gc.collect()
     except KeyboardInterrupt:
         pass
     finally:

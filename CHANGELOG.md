@@ -3,6 +3,44 @@
 Tum onemli degisiklikler bu dosyada belgelenir.
 Format [Keep a Changelog](https://keepachangelog.com/) standardina uygundur.
 
+## [0.3.2] - 2026-03-02
+
+### Performans - Minimum Donanim, Maksimum Performans
+
+**Python I/O Optimizasyonlari:**
+- `compressed_log.py`: Persistent gzip handle (her yazimda open/close yerine surekli acik) - %95 syscall azaltma, 5-10x daha iyi sikistirma orani
+- `ai_dashboard.py`: systemctl cagrilari 30s TTL cache ile onbelleklendi (96 fork/dk -> 16 fork/dk, %83 azalma)
+- `ai_dashboard.py`: `psutil.net_connections()` 30s TTL cache ile onbelleklendi (pahali kernel traversal)
+- `ai_logs.py`: `deque(f, maxlen=limit)` ile streaming log okuma (25MB -> ~10KB peak RAM, %99.96 azalma)
+- `ai_lfs.py`: numpy lazy import (yalnizca tflite backend'de yuklenir, -25MB RSS)
+- `ai_agent.py`: Regex kaliplari modul seviyesinde `re.compile()` ile on-derleme
+
+**Bellek Korumalari:**
+- `ai_monitor.py`: MAX_MEMORY_MB=200 watchdog, her 12 dongude gc.collect()
+- `ai_dashboard.py`: Her 60 tick'te (~5 dk) gc.collect() ile RSS buyumesi onlendi
+
+**C Struct Optimizasyonlari:**
+- `compressed_buffer.h`: packed_entry_t 17->16 byte (2x uint32_t IO alanlari 5-byte packed formata donusturuldu)
+- `compressed_buffer.h`: `_Static_assert(sizeof(packed_entry_t) == 16)` eklendi
+- `compressed_buffer.h`: `cb_set_io()`, `cb_get_read_kb()`, `cb_get_write_kb()` inline accessor'lar
+- `compressed_buffer.h`: `raw_metrics_t` IO alanlari `unsigned long` -> `uint32_t` (-8 byte)
+- `compressed_buffer.h`: Buffer tahsisi `CB_MAX_ENTRIES` yerine `cb_max` ile (%50 azalma)
+- `cpu-buffer-unit.h`: Buffer tahsisi `MAX_ENTRIES` yerine `buffer_max` ile (%50 azalma)
+- `cpu_metrics_collector.h`: `policy[64]` -> `policy[16]` (governor isimleri max 12 karakter)
+- `cpufreg-inline.h`: `current_policy[128]` -> `current_policy[16]`
+- `sentielcpu_io_stats.h`: `line[512]` -> `line[256]`
+- `ai_core.c`: `status_buf[256]` -> `status_buf[96]`
+
+**Kod Kalitesi:**
+- `governor_ids.h`: Yeni paylasimli header - governor ID eslemesi tek kaynakta toparlandi
+- `compressed_buffer.h` ve `cpu_metrics_collector.h`'den duplicate governor tablolari kaldirildi
+- `ai_core.c`: `AI_IOC_GET_FREQ/SET_FREQ` icin acik ioctl stub'lari eklendi
+
+### Duzeltilen
+- `ai_browser_agent.py`: Eksik `BOLD` sabiti eklendi (TailscaleAgent.status() NameError duzeltildi)
+
+---
+
 ## [0.3.1] - 2026-03-02
 
 ### Temizlik

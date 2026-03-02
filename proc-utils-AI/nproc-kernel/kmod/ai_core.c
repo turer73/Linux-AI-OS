@@ -219,6 +219,11 @@ static long ai_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
         break;
     }
 
+    /* Reserved ioctl commands (defined in ai_ioctl.h but not yet implemented) */
+    case AI_IOC_GET_FREQ:
+    case AI_IOC_SET_FREQ:
+        return -ENOTTY;
+
     default:
         return -ENOTTY;
     }
@@ -244,7 +249,7 @@ static int ai_release(struct inode *inode, struct file *filp)
 static ssize_t ai_read(struct file *filp, char __user *buf,
                         size_t count, loff_t *ppos)
 {
-    char status_buf[256];
+    char status_buf[96];  /* max ~80 chars for status line */
     int len;
 
     mutex_lock(&ai_mutex);

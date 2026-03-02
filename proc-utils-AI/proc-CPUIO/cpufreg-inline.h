@@ -15,7 +15,7 @@
 
 static volatile int runner = 1;
 static volatile int turbo_enabled = 0;
-static char current_policy[BUF_SIZE] = "ondemand";
+static char current_policy[16] = "ondemand";  /* governor names max 12 chars */
 
 void safe_write(const char *path, const char *data) {
     int fd = open(path, O_WRONLY);

@@ -73,13 +73,13 @@ void set_buffer_size(int new_size) {
     pthread_mutex_lock(&buffer_lock);
     buffer_max = new_size;
     write_index = 0;
-    memset(buffer_entries, 0, sizeof(struct buffer_entry) * MAX_ENTRIES);
+    memset(buffer_entries, 0, sizeof(struct buffer_entry) * buffer_max);
     pthread_mutex_unlock(&buffer_lock);
     printf("Buffer size changed to %d\n", buffer_max);
 }
 
 int init_cpu_buffer_unit(void) {
-    buffer_entries = calloc(MAX_ENTRIES, sizeof(struct buffer_entry));
+    buffer_entries = calloc(buffer_max, sizeof(struct buffer_entry));
     if (!buffer_entries) {
         perror("Allocation failed");
         return 1;

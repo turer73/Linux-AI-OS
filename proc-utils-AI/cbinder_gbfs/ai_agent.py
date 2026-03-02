@@ -29,6 +29,10 @@ from datetime import datetime
 import psutil
 import yaml
 
+# Pre-compiled regex patterns for tool call parsing (avoid per-call recompilation)
+_RE_TOOL_OBJECT = re.compile(r'\{[^{}]*"tool"\s*:\s*"[^"]+[^{}]*\}')
+_RE_TOOL_ARRAY = re.compile(r'\[[\s\S]*?\{[^{}]*"tool"[^{}]*\}[\s\S]*?\]')
+
 # --- Constants ---
 
 TAG = "[ai-agent]"
@@ -726,8 +730,7 @@ def parse_tool_calls(text):
     remaining = text
 
     # Try to find JSON objects or arrays in the response
-    json_pattern = r'\{[^{}]*"tool"\s*:\s*"[^"]+[^{}]*\}'
-    matches = re.findall(json_pattern, text)
+    matches = _RE_TOOL_OBJECT.findall(text)
 
     for match in matches:
         try:
@@ -739,8 +742,7 @@ def parse_tool_calls(text):
             continue
 
     # Also try JSON array
-    array_pattern = r'\[[\s\S]*?\{[^{}]*"tool"[^{}]*\}[\s\S]*?\]'
-    array_matches = re.findall(array_pattern, text)
+    array_matches = _RE_TOOL_ARRAY.findall(text)
     for match in array_matches:
         try:
             arr = json.loads(match)

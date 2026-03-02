@@ -21,7 +21,6 @@ import os
 import csv
 import pickle
 import psutil
-import numpy as np
 from datetime import datetime
 
 # Try to use compressed logging
@@ -109,6 +108,7 @@ def load_tflite_model():
 
 
 def predict_tflite(interpreter, scaler, stats):
+    import numpy as np  # lazy: only loaded when tflite backend is active
     scaled = scaler.transform([stats]).astype(np.float32)
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
@@ -302,6 +302,9 @@ def main():
         main_loop()
     except KeyboardInterrupt:
         print("\n[AI-LFS] Kapatiliyor...")
+        if USE_COMPRESSED_LOG:
+            _logger.flush()
+            _logger.close()
 
 
 if __name__ == "__main__":
