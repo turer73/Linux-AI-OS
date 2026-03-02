@@ -32,6 +32,9 @@ ai-dev = []
 webops = ["requests"]
 full = ["torch", "tensorflow", "pyttsx3", "matplotlib", "seaborn", "watchdog"]
 
+[tool.setuptools.packages.find]
+where = ["proc-utils-AI"]
+
 [project.scripts]
 ai-cpufregd = "cbinder_gbfs.ai_cpufregd:main"
 ai-voicer = "cbinder_gbfs.ai_voicer:main"

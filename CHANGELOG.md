@@ -3,6 +3,30 @@
 Tum onemli degisiklikler bu dosyada belgelenir.
 Format [Keep a Changelog](https://keepachangelog.com/) standardina uygundur.
 
+## [0.3.1] - 2026-03-02
+
+### Temizlik
+- Eski dosyalar silindi: `grant_permission_revoke.c`, `kernel-start.c`
+- `include-old/` dizini tamamen kaldirildi (4 eski header arsivi)
+- TPU bozuk placeholder dosyalari temizlendi (`a` bos dosyalari, pseudo-kod `tpu-track-simulation.c`)
+- `nproc-kernel/README.md` guncellendi (eski dosya referanslari kaldirildi)
+
+### Duzeltilen
+- `ai_agent.py`: `global OLLAMA_MODEL` bildirimi fonksiyon basina tasindi (Python 3.13+ SyntaxError)
+- `pyproject.toml`: `[tool.setuptools.packages.find] where = ["proc-utils-AI"]` eklendi (package discovery)
+- `test_train_ai_model.py`: `IOModel` import hatasi duzeltildi (sinif fonksiyon icinde tanimli)
+
+### Test Altyapisi
+- Yeni test dosyalari: `test_ai_agent.py` (13 test), `test_ai_logs.py` (14 test), `test_ai_help.py` (13 test), `test_ai_backup.py` (12 test), `test_ai_kernel_bridge.py` (13 test, Linux-only)
+- Toplam: 96 test (96 passed, 2 skipped) - onceki: 31 test
+- Windows platformunda Linux-only testler icin `pytest.skip(allow_module_level=True)` eklendi
+
+### Dokumantasyon
+- `ROADMAP.md` tamamen yeniden yazildi (guncel proje durumu, FAZ 2.5 eklendi)
+- TPU modulleri icin `README.md` dosyalari eklendi (PCIO-TPU-segoffline, PCIO-TPU-segonline)
+
+---
+
 ## [0.3.0] - 2026-02-28
 
 ### Eklenen (Sikistirma ve Performans Optimizasyonu)

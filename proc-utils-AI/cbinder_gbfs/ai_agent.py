@@ -966,6 +966,7 @@ def show_agent_status():
 # --- CLI ---
 
 def main():
+    global OLLAMA_MODEL
     parser = argparse.ArgumentParser(
         prog="ai-agent",
         description="Linux-AI: Yerel AI asistan (tool-calling destekli)"
@@ -978,7 +979,6 @@ def main():
                         help=f"Ollama model (varsayilan: {OLLAMA_MODEL})")
     args = parser.parse_args()
 
-    global OLLAMA_MODEL
     if args.model != OLLAMA_MODEL_AGENT:
         OLLAMA_MODEL = args.model  # User explicitly specified a model
 

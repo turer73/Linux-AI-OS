@@ -22,9 +22,6 @@ nproc-kernel/
   │   ├── ai_status.c        # Sistem durumu sorgulama
   │   ├── ai_permissions.c   # Izin yonetimi araci
   │   └── Makefile
-  ├── include-old/            # Eski header dosyalari (arsiv, silinecek)
-  ├── kernel-start.c          # Eski test istemcisi (arsiv)
-  ├── grant_permission_revoke.c # Eski izin kodu (arsiv)
   └── dkms.conf               # DKMS otomatik yukleme
 ```
 
