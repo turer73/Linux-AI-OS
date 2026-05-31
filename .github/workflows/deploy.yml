@@ -150,8 +150,11 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          # Pass untrusted commit message via env (NOT shell interpolation) to prevent
+          # script injection: a commit message like $(curl evil) must stay literal data.
+          COMMIT_MSG_RAW: ${{ github.event.head_commit.message }}
         run: |
-          COMMIT_MSG=$(echo "${{ github.event.head_commit.message }}" | head -1)
+          COMMIT_MSG=$(printf '%s' "$COMMIT_MSG_RAW" | head -1)
           STATUS="${{ needs.deploy-coolify.result }}"
 
           MSG="[Linux-AI Deploy] ${STATUS}
