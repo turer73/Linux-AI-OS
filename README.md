@@ -133,3 +133,8 @@ For precompiled binaries:
 ```bash
 yay -S plasma-system-ai-bin
 ```
+
+## License
+
+This repository is licensed under the **GNU General Public License v2.0 only**
+(`GPL-2.0-only`). Full text: [LICENSE.txt](LICENSE.txt).
